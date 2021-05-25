@@ -18,11 +18,17 @@ def align2(model,data):
     alignment_error = model - data
     #hier werden dann für die einzelnen punkte die translation fehler berechnet also sqrt(x^2 +y^2) so wie wir es auch machen
     trans_error = numpy.sqrt(numpy.sum(numpy.multiply(alignment_error,alignment_error),0)).A[0]
-        
-    return rot,trans,trans_error```
+         
+    return rot,trans,trans_error 
+```
 3.  And change line
-    ```rot,trans,trans_error = align(second_xyz,first_xyz)```
-  to
-    ```rot,trans,trans_error = align2(second_xyz,first_xyz)```
+    ```
+    rot,trans,trans_error = align(second_xyz,first_xyz)
+    ```
+    to
+    ```
+    rot,trans,trans_error = align2(second_xyz,first_xyz)
+    ```
+    
 4.  Put the files into the same folder as main.py
 5. To run write python3 main.py
