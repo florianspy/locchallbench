@@ -31,4 +31,6 @@ def align2(model,data):
     ```
     
 4.  Put the files into the same folder as main.py
-5. To run write: python3 main.py
+5. To run write: 
+```python3 main.py 
+```
