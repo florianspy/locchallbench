@@ -35,10 +35,10 @@ if __name__ == '__main__':
         static_transformStamped4.transform.translation.y = 0.0+0.0149604650214
         static_transformStamped4.transform.translation.z = 0.2125+0.000170986939338
         quat = tf.transformations.quaternion_from_euler(0,0,0)
-        static_transformStamped4.transform.rotation.x = -0.00894242804497
-        static_transformStamped4.transform.rotation.y = 0.00165949144866
-        static_transformStamped4.transform.rotation.z = 0.00163967593107
-        static_transformStamped4.transform.rotation.w = 0.99995726347
+        static_transformStamped4.transform.rotation.x = 0.0
+        static_transformStamped4.transform.rotation.y = 0.0
+        static_transformStamped4.transform.rotation.z = 0.0
+        static_transformStamped4.transform.rotation.w = 1
  	#the use of camera_link to openni_camera is a workaround so that all systems find the right transformations
         static_transformStamped2 = geometry_msgs.msg.TransformStamped()
         static_transformStamped2.header.frame_id = "camera_link" 
