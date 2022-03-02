@@ -10,7 +10,8 @@ import os
 from pathlib import Path
 import math
 import mplcursors
-
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
 _EPS = numpy.finfo(float).eps * 4.0
 _AXES2TUPLE = {
     'sxyz': (0, 0, 0, 0), 'sxyx': (0, 0, 1, 0), 'sxzy': (0, 1, 0, 0),
@@ -203,9 +204,8 @@ def evaluate(eval_path, gt_path):
     klast = 0
     gtlength=getpathlength(gt_data)
     evallength=getpathlength(eval_data)
-    outliner=0
     totaldata=0
-    prevgt=[0,0]
+    prevgt=[0,0,0]
     firsteval=1
     discon=0.0
     disconcount=0
@@ -228,32 +228,45 @@ def evaluate(eval_path, gt_path):
                 a = (eval_data[i, 0] - gt_data[k, 0]) / (gt_data[k + 1, 0] - gt_data[k, 0])
                 x_gt = a * gt_data[k + 1, 1] + (1 - a) * gt_data[k, 1]
                 y_gt = a * gt_data[k + 1, 2] + (1 - a) * gt_data[k, 2]
-                z_gt = a * gt_data[k + 1, 3] + (1 - a) * gt_data[k, 3]
-                z_gt = 0		
+                z_gt = 0
+                #z_gt = a * gt_data[k + 1, 3] + (1 - a) * gt_data[k, 3]		
                 e = np.sqrt((eval_data[i, 1] - x_gt) ** 2 + (eval_data[i, 2] - y_gt) ** 2)
+                #e = np.sqrt((eval_data[i, 1] - x_gt) ** 2 + (eval_data[i, 2] - y_gt) ** 2+ (eval_data[i, 3] - z_gt) ** 2)
                 error_array = np.append(error_array, e)
                 if firsteval == 1:
                    firsteval = 0
                 else:
                    vecgt=[x_gt-prevgt[0],y_gt-prevgt[1]]
+                   #vecgt=[x_gt-prevgt[0],y_gt-prevgt[1],z_gt-prevgt[2]]
                    #the jump occurred between i-1 and i so if you want to look at it inspect the data at i-1
                    veceval=[eval_data[i, 1]-eval_data[i-1, 1],eval_data[i, 2]-eval_data[i-1, 2]]
+                   #veceval=[eval_data[i, 1]-eval_data[i-1, 1],eval_data[i, 2]-eval_data[i-1, 2],eval_data[i, 3]-eval_data[i-1, 3]]
                    lenvecgt=math.sqrt(math.pow(vecgt[0],2)+math.pow(vecgt[1],2))
+                   #lenvecgt=math.sqrt(math.pow(vecgt[0],2)+math.pow(vecgt[1],2)+math.pow(vecgt[2],2))
                    #we cannot just subtract veceval from vecgt because if there is a rotation in the evaluation data the vectors' will point in different directions,
                    #with the calculate length then being too large. We therefor directly compare the lenght of the two vectors.                   
                    lengveceval=math.sqrt(math.pow(veceval[0],2)+math.pow(veceval[1],2))
-                   if lenvecgt != 0 and lengveceval > 0.01:
-                      print(math.pow(lengveceval/lenvecgt-1,2),eval_data[i, 0])
-                      discon=discon+math.pow(lengveceval/lenvecgt-1,2)
-                      disconcount=disconcount+1
-                prevgt=[x_gt,y_gt]
+                   #lengveceval=math.sqrt(math.pow(veceval[0],2)+math.pow(veceval[1],2)+math.pow(veceval[2],2))
+                   if lenvecgt > 0.0001 :
+                      discon=discon+math.pow(1-lengveceval/lenvecgt,2)
+                      disconcount=disconcount+1                
+                prevgt=[x_gt,y_gt,z_gt]
                 #angle at k+1 and angle at current k
                 angleskp1 = euler_from_quaternion([gt_data[k + 1, 4], gt_data[k + 1,5],gt_data[k + 1,6], gt_data[k + 1, 7]])
                 anglesk = euler_from_quaternion([gt_data[k, 4], gt_data[k,5],gt_data[k,6], gt_data[k, 7]])
-                anglez_gt=a*angleskp1[2]+(1-a)*anglesk[2]
+                if anglesk[2]>0 and angleskp1[2]<0 :	
+                      angleskp1=angleskp1[2]+math.pi*2
+                      anglez_gt=a*angleskp1+(1-a)*anglesk[2]
+                      if anglez_gt > math.pi:
+                      	anglez_gt=anglez_gt-math.pi*2
+                else:                
+                      anglez_gt=a*angleskp1[2]+(1-a)*anglesk[2]
                 angleval= euler_from_quaternion([eval_data[i, 4], eval_data[i,5],eval_data[i,6], eval_data[i, 7]])
                 eang=angleval[2]-anglez_gt
                 error_ang_array = np.append(error_ang_array,eang)
+    if len(error_array) == 0:
+        print("No Data with matching timestamps")
+        return
     rmse = np.sqrt(np.dot(error_array, error_array) / len(error_array))
     mean = np.mean(error_array)
     meanang = np.mean(error_ang_array)
@@ -272,8 +285,7 @@ def evaluate(eval_path, gt_path):
     rmset = numpy.sqrt(numpy.dot(trans_error, trans_error) / len(trans_error))
     rmser = numpy.sqrt(numpy.dot(rot_error, rot_error) / len(rot_error))
     relpath=evallength/gtlength
-    print("Amount of outliners: "+str(outliner)+" in total data points: "+str(len(error_array)))
-    discoty=math.sqrt(discon/disconcount)
+    discoty=math.sqrt(discon)/disconcount
     with open(texfile, "a") as param:
         writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)
         param.write(writing)
@@ -294,6 +306,7 @@ def evaluate(eval_path, gt_path):
     DefaultSize = f.get_size_inches()
     f.set_size_inches( (DefaultSize[0]*2, DefaultSize[1]*2) )
     f.savefig(output_plot_file_name, bbox_inches='tight')
-
+    output_plot_file_name = tail[first+1:end]+".pdf"
+    f.savefig(output_plot_file_name, bbox_inches='tight')
 if __name__ == "__main__":
     evaluate("0-visual_odom_orb.txt", "0-gt.txt")
