@@ -1,3 +1,5 @@
+#caution timestamps can only be 15 digits long as the number after the digit is already 9 only 6 digits before the dot are allowed
+#The reason for this is that python stores all the data in float variables which can only handle 15 digits
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -169,8 +171,16 @@ def evaluate(eval_path, gt_path):
     '''Begin Main'''
     remove_old_output_file()
     gt_data = read_file(gt_path)
+    for i in range(len(gt_data)):
+        digits="%.10f" % gt_data[i,0]
+        digits2=digits.split(".")
+        gt_data[i,0]=float(digits2[0][4:]+'.'+digits2[1][:-1])
     eval_data = read_file(eval_path)  
-    maxmin=[eval_data[0,1],eval_data[0,1],eval_data[0,2] ,eval_data[0,2]]    
+    for i in range(len(eval_data)):
+        digits="%.10f" % eval_data[i,0]
+        digits2=digits.split(".")
+        eval_data[i,0]=float(digits2[0][4:]+'.'+digits2[1][:-1]) 
+    maxmin=[eval_data[0,1],eval_data[0,1],eval_data[0,2] ,eval_data[0,2]]   
     plot_data(gt_data, 'black')
     plot_data(eval_data, 'orange')
     head, tail = os.path.split(eval_path)
@@ -254,15 +264,15 @@ def evaluate(eval_path, gt_path):
                 #angle at k+1 and angle at current k
                 angleskp1 = euler_from_quaternion([gt_data[k + 1, 4], gt_data[k + 1,5],gt_data[k + 1,6], gt_data[k + 1, 7]])
                 anglesk = euler_from_quaternion([gt_data[k, 4], gt_data[k,5],gt_data[k,6], gt_data[k, 7]])
-                if anglesk[2]>0 and angleskp1[2]<0 :	
-                      angleskp1=angleskp1[2]+math.pi*2
-                      anglez_gt=a*angleskp1+(1-a)*anglesk[2]
-                      if anglez_gt > math.pi:
-                      	anglez_gt=anglez_gt-math.pi*2
-                else:                
-                      anglez_gt=a*angleskp1[2]+(1-a)*anglesk[2]
+                #special case
+                if anglesk[2]>0 and angleskp1[2]<0 :	                	
+                	anglez_gt=a*(angleskp1[2]+math.pi*2)+(1-a)*anglesk[2]
+                	if anglez_gt > math.pi:
+                	  anglez_gt=anglez_gt-math.pi
+                else:               
+                	anglez_gt=a*angleskp1[2]+(1-a)*anglesk[2]
                 angleval= euler_from_quaternion([eval_data[i, 4], eval_data[i,5],eval_data[i,6], eval_data[i, 7]])
-                eang=angleval[2]-anglez_gt
+                eang=angleval[2]-anglez_gt   
                 error_ang_array = np.append(error_ang_array,eang)
     if len(error_array) == 0:
         print("No Data with matching timestamps")
