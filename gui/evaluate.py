@@ -171,16 +171,16 @@ def evaluate(eval_path, gt_path):
     '''Begin Main'''
     remove_old_output_file()
     gt_data = read_file(gt_path)
-    for i in range(len(eval_data)):
-        digits="%.10f" % eval_data[i,0]
+    for i in range(len(gt_data)):
+        digits="%.10f" % gt_data[i,0]
         digits2=digits.split(".")
-        eval_data[i,0]=float(digits2[0][4:]+'.'+digits2[1][:-1]) 
+        gt_data[i,0]=float(digits2[0][4:]+'.'+digits2[1][:-1])
     eval_data = read_file(eval_path)  
     for i in range(len(eval_data)):
         digits="%.10f" % eval_data[i,0]
         digits2=digits.split(".")
         eval_data[i,0]=float(digits2[0][4:]+'.'+digits2[1][:-1]) 
-    maxmin=[eval_data[0,1],eval_data[0,1],eval_data[0,2] ,eval_data[0,2]]    
+    maxmin=[eval_data[0,1],eval_data[0,1],eval_data[0,2] ,eval_data[0,2]]   
     plot_data(gt_data, 'black')
     plot_data(eval_data, 'orange')
     head, tail = os.path.split(eval_path)
@@ -264,34 +264,26 @@ def evaluate(eval_path, gt_path):
                 #angle at k+1 and angle at current k
                 angleskp1 = euler_from_quaternion([gt_data[k + 1, 4], gt_data[k + 1,5],gt_data[k + 1,6], gt_data[k + 1, 7]])
                 anglesk = euler_from_quaternion([gt_data[k, 4], gt_data[k,5],gt_data[k,6], gt_data[k, 7]])
-		#Changed Interpolation for angle calculation for ground truth at critical point when positive value for gt followed by a negative angle for gt, or vise versa. 
+                #Changed Interpolation for angle calculation for ground truth at critical point when positive value for gt followed by a negative angle for gt, or vise versa. 
 		#This requires bringing the negative angle in a positive value only system and then based on the outcome of the interpolation converting it back into a negative angle.
-                if anglesk[2]>0 and angleskp1[2]<0 :
+                if anglesk[2]>0 and angleskp1[2]<0 and (angleskp1[2]+math.pi*2-anglesk[2])<math.pi:
                 	intermedian=angleskp1[2]+math.pi*2
-                	if (intermedian-anglesk[2])>math.pi:
-                	  anglez_gt=(angleskp1[2])*a+(1-a)*anglesk[2] 
-                	else:
-                	  anglez_gt=(intermedian)*a+(1-a)*anglesk[2] 
+                	anglez_gt=(intermedian)*a+(1-a)*anglesk[2] 
                 	if anglez_gt > math.pi:
                 	  anglez_gt=anglez_gt-2*math.pi
-                elif anglesk[2]<0 and angleskp1[2]>0:
-                	intermedian=anglesk[2]+math.pi*2
-                	if (intermedian-angleskp1[2])>math.pi:
-                	  anglez_gt=(angleskp1[2])*a+(1-a)*anglesk[2] 
-                	else:
-                	  anglez_gt=(angleskp1[2])*a+(1-a)*intermedian 
+                elif anglesk[2]<0 and angleskp1[2]>0 and (anglesk[2]+math.pi*2-angleskp1[2])<math.pi:
+                	intermedian=anglesk[2]+math.pi*2     
+                	anglez_gt=(angleskp1[2])*a+(1-a)*intermedian 
                 	if anglez_gt > math.pi:
                 	  anglez_gt=anglez_gt-2*math.pi
                 else:               
                 	anglez_gt=a*angleskp1[2]+(1-a)*anglesk[2]
                 angleval= euler_from_quaternion([eval_data[i, 4], eval_data[i,5],eval_data[i,6], eval_data[i, 7]])
-                print(str(angleval[2])+" "+str(anglez_gt)+" "+str(eval_data[i, 0]))
-                eang=angleval[2]-anglez_gt
+                eang=angleval[2]-anglez_gt   
                 error_ang_array = np.append(error_ang_array,eang)
     if len(error_array) == 0:
         print("No Data with matching timestamps")
         return
-
     rmse = np.sqrt(np.dot(error_array, error_array) / len(error_array))
     mean = np.mean(error_array)
     meanang = np.mean(error_ang_array)
@@ -309,12 +301,8 @@ def evaluate(eval_path, gt_path):
     rot_error = numpy.array(result)[:, 5]
     rmset = numpy.sqrt(numpy.dot(trans_error, trans_error) / len(trans_error))
     rmser = numpy.sqrt(numpy.dot(rot_error, rot_error) / len(rot_error))
-    relpath = 1
-    if gtlength != 0: 
-    	relpath=evallength/gtlength
-    discoty=0
-    if disconcount != 0:
-    	discoty=math.sqrt(discon)/disconcount
+    relpath=evallength/gtlength
+    discoty=math.sqrt(discon)/disconcount
     with open(texfile, "a") as param:
         writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)
         param.write(writing)
