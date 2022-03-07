@@ -301,8 +301,12 @@ def evaluate(eval_path, gt_path):
     rot_error = numpy.array(result)[:, 5]
     rmset = numpy.sqrt(numpy.dot(trans_error, trans_error) / len(trans_error))
     rmser = numpy.sqrt(numpy.dot(rot_error, rot_error) / len(rot_error))
-    relpath=evallength/gtlength
-    discoty=math.sqrt(discon)/disconcount
+    relpath = 1
+    if gtlength != 0: 
+    	relpath=evallength/gtlength
+    discoty=0
+    if disconcount != 0:
+    	discoty=math.sqrt(discon)/disconcount
     with open(texfile, "a") as param:
         writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)
         param.write(writing)
