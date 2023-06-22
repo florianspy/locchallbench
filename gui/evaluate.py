@@ -107,18 +107,20 @@ def euler_from_matrix(matrix, axes='sxyz'):
     if frame:
         ax, az = az, ax
     return ax, ay, az
-
+removelatex="1"
 def evaluate(eval_path, gt_path):
     print("File to be evaluated:{}".format(eval_path))
     axis = numpy.array([[0.0, 4.5, 3.2, 9.5], [-5, 10, -10, 20], [-1, 16, -7, 20]])
     setnum=0
     output_plot_file_name = "out.pdf"    
     texfile = "latex.tex"
-    try:
-        os.remove(texfile)
-        print("File Removed!")
-    except:
-         print("File not there")
+    if removelatex == "1":
+        try:
+            os.remove(texfile)
+            print("File Removed!")
+        except:
+            print("File not there")
+
     def remove_old_output_file():
         try:
             os.remove(output_plot_file_name)
@@ -133,7 +135,7 @@ def evaluate(eval_path, gt_path):
 
     def plot_data(data, str_color):
         plt.plot(data[:, 1], data[:, 2], str_color, linewidth=2)
-        starting_point = (data[1, 1], data[1, 2])
+        starting_point = (data[0, 1], data[0, 2])
         end_point = (data[len(data) - 1, 1], data[len(data) - 1, 2])
         plt.plot(starting_point[0], starting_point[1], 'kx', markersize=7, mew=2)
         plt.plot(end_point[0], end_point[1], 'k+', markersize=10, mew=2)
@@ -206,7 +208,8 @@ def evaluate(eval_path, gt_path):
     patchList.append(black_patch)
     patchList.append(start)
     patchList.append(goal)
-    first_legend=plt.legend(handles=patchList,loc='upper left',fancybox=True, framealpha=0.5, markerscale=1,handletextpad=0.,bbox_to_anchor=(-0.02, 1.02),frameon=False,fontsize=24)  #    
+    first_legend=plt.legend(handles=patchList,loc='upper left',fancybox=True, framealpha=0.5, markerscale=1,handletextpad=0.,bbox_to_anchor=(-0.02, 1.02),frameon=False,fontsize=24)  #  
+
     skip = 1
     # http://akuederle.com/create-numpy-array-with-for-loop
     error_array = np.array([])
@@ -214,6 +217,8 @@ def evaluate(eval_path, gt_path):
     klast = 0
     gtlength=getpathlength(gt_data)
     evallength=getpathlength(eval_data)
+    print(evallength)
+    print(gtlength)
     totaldata=0
     prevgt=[0,0,0]
     firsteval=1
@@ -280,6 +285,10 @@ def evaluate(eval_path, gt_path):
                 	anglez_gt=a*angleskp1[2]+(1-a)*anglesk[2]
                 angleval= euler_from_quaternion([eval_data[i, 4], eval_data[i,5],eval_data[i,6], eval_data[i, 7]])
                 eang=angleval[2]-anglez_gt   
+                if(eang>3.14159265359):
+                	eang=eang-3.14159265359 
+                if(eang<-3.14159265359):
+                	eang=eang+3.14159265359 
                 error_ang_array = np.append(error_ang_array,eang)
     if len(error_array) == 0:
         print("No Data with matching timestamps")
@@ -290,17 +299,29 @@ def evaluate(eval_path, gt_path):
     median = np.median(error_array)
     std = np.std(error_array)
     max = np.max(error_array)
-    maxang=np.max(error_ang_array)    
+    min = np.min(error_array)   
+    if(max < abs(min)):
+    	print("Min > Max")
+    	max=abs(min)	    
+    maxang=np.max(error_ang_array)
+    minang=np.min(error_ang_array)        
+    if(maxang < abs(minang)):
+    	maxang=abs(minang)	
     meanang = np.mean(error_ang_array)
     medianang = np.median(error_ang_array)
     stdang = np.std(error_ang_array)
-    traj_gt = tr.read_trajectory(gt_path)
-    traj_est = tr.read_trajectory(eval_path)
-    result = tr.evaluate_trajectory(traj_gt, traj_est, 10000, True, 1.00, "s", 0.00, 1.00)
-    trans_error = numpy.array(result)[:, 4]
-    rot_error = numpy.array(result)[:, 5]
-    rmset = numpy.sqrt(numpy.dot(trans_error, trans_error) / len(trans_error))
-    rmser = numpy.sqrt(numpy.dot(rot_error, rot_error) / len(rot_error))
+    try:
+    	traj_gt = tr.read_trajectory(gt_path)
+    	traj_est = tr.read_trajectory(eval_path)
+    	result = tr.evaluate_trajectory(traj_gt, traj_est, 10000, True, 1.00, "s", 0.00, 1.00)
+    	trans_error = numpy.array(result)[:, 4]
+    	rot_error = numpy.array(result)[:, 5]
+    	rmset = numpy.sqrt(numpy.dot(trans_error, trans_error) / len(trans_error))
+    	rmser = numpy.sqrt(numpy.dot(rot_error, rot_error) / len(rot_error))
+    except:
+    	rmser=0
+    	rmset=0
+    	print("Your data is not 1 second long = minimum length as relative error requires data of 1s timedifference")
     relpath = 1
     if gtlength != 0: 
     	relpath=evallength/gtlength
@@ -308,7 +329,7 @@ def evaluate(eval_path, gt_path):
     if disconcount != 0:
     	discoty=math.sqrt(discon)/disconcount
     with open(texfile, "a") as param:
-        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)
+        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}\n".format(discoty)
         param.write(writing)
     with open(texfile, "r+") as param:
         content = param.read()
@@ -330,4 +351,7 @@ def evaluate(eval_path, gt_path):
     output_plot_file_name = tail[first+1:end]+".pdf"
     f.savefig(output_plot_file_name, bbox_inches='tight')
 if __name__ == "__main__":
-    evaluate("0-visual_odom_orb.txt", "0-gt.txt")
+    removelatex=sys.argv[3]
+    if removelatex == "1":
+        print(sys.argv[2],sys.argv[1],removelatex)	
+    evaluate(sys.argv[1], sys.argv[2])
