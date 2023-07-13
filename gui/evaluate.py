@@ -225,7 +225,7 @@ def evaluate(eval_path, gt_path):
     discon2=0.0
     disconcount=0
     for i in range(0, np.size(eval_data, 0) - 1): 
-        getmaxmin(eval_data[i],maxmin)            
+        getmaxmin(eval_data[i],maxmin) #required for plotting          
         if eval_data[i, 0] < gt_data[0, 0]:
             print("no gt data available for this timestamp")
         else:
