@@ -209,7 +209,6 @@ def evaluate(eval_path, gt_path):
     patchList.append(start)
     patchList.append(goal)
     first_legend=plt.legend(handles=patchList,loc='upper left',fancybox=True, framealpha=0.5, markerscale=1,handletextpad=0.,bbox_to_anchor=(-0.02, 1.02),frameon=False,fontsize=24)  #  
-
     skip = 1
     # http://akuederle.com/create-numpy-array-with-for-loop
     error_array = np.array([])
@@ -223,6 +222,7 @@ def evaluate(eval_path, gt_path):
     prevgt=[0,0,0]
     firsteval=1
     discon=0.0
+    discon2=0.0
     disconcount=0
     for i in range(0, np.size(eval_data, 0) - 1): 
         getmaxmin(eval_data[i],maxmin)            
@@ -261,9 +261,10 @@ def evaluate(eval_path, gt_path):
                    #we cannot just subtract veceval from vecgt because if there is a rotation in the evaluation data the vectors' will point in different directions,
                    #with the calculate length then being too large. We therefor directly compare the lenght of the two vectors.                   
                    lengveceval=math.sqrt(math.pow(veceval[0],2)+math.pow(veceval[1],2))
-                   #lengveceval=math.sqrt(math.pow(veceval[0],2)+math.pow(veceval[1],2)+math.pow(veceval[2],2))
+                   lengveceval2=math.sqrt(math.pow(veceval[0]-vecgt[0],2)+math.pow(veceval[1]-vecgt[1],2))
                    if lenvecgt > 0.0001 :
                       discon=discon+math.pow(1-lengveceval/lenvecgt,2)
+                      discon2=discon2+math.pow(lengveceval2/lenvecgt,2)
                       disconcount=disconcount+1                
                 prevgt=[x_gt,y_gt,z_gt]
                 #angle at k+1 and angle at current k
@@ -317,7 +318,7 @@ def evaluate(eval_path, gt_path):
     	trans_error = numpy.array(result)[:, 4]
     	rot_error = numpy.array(result)[:, 5]
     	rmset = numpy.sqrt(numpy.dot(trans_error, trans_error) / len(trans_error))
-    	rmser = numpy.sqrt(numpy.dot(rot_error, rot_error) / len(rot_error))
+    	rmser = numpy.sqrt(numpy.dot(rot_error, rot_error) / len(rot_error))#we do not convert to degree!
     except:
     	rmser=0
     	rmset=0
@@ -326,19 +327,22 @@ def evaluate(eval_path, gt_path):
     if gtlength != 0: 
     	relpath=evallength/gtlength
     discoty=0
+    discoty2=0
     if disconcount != 0:
     	discoty=math.sqrt(discon)/disconcount
+    	discoty2=math.sqrt(discon2/disconcount)
+
     with open(texfile, "a") as param:
-        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}\n".format(discoty)
+        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)+" & {:.3f}\n".format(discoty2)
         param.write(writing)
     with open(texfile, "r+") as param:
         content = param.read()
         param.seek(0, 0)
-        writing = "Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity "   
+        writing = "Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & Discontinuity2 "   
         writing = writing + " \\\ \hline \n"             
         param.write(writing + content)
-    print("Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity ")
-    print(rmse,rmset,rmser,max,maxang, mean, meanang, median,medianang, std, stdang,relpath*100.0,discoty)
+    print("Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & Discontinuity2 ")
+    print(rmse,rmset,rmser,max,maxang, mean, meanang, median,medianang, std, stdang,relpath*100.0,discoty,discoty2)
     '''crs=mplcursors.cursor(hover=True)
     crs.connect("add", lambda sel: sel.annotation.set_text('Point {},{}'.format(sel.target[0], sel.target[1])))
     plt.show()'''	
