@@ -338,10 +338,10 @@ def evaluate(eval_path, gt_path):
     with open(texfile, "r+") as param:
         content = param.read()
         param.seek(0, 0)
-        writing = "Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & Discontinuity2 "   
+        writing = "Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 "   
         writing = writing + " \\\ \hline \n"             
         param.write(writing + content)
-    print("Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & Discontinuity2 ")
+    print("Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 ")
     print(rmse,rmset,rmser,max,maxang, mean, meanang, median,medianang, std, stdang,relpath*100.0,discoty,discoty2)
     '''crs=mplcursors.cursor(hover=True)
     crs.connect("add", lambda sel: sel.annotation.set_text('Point {},{}'.format(sel.target[0], sel.target[1])))
