@@ -14,6 +14,7 @@ import math
 import mplcursors
 plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['ps.fonttype'] = 42
+#from https://github.com/matthew-brett/transforms3d
 _EPS = numpy.finfo(float).eps * 4.0
 _AXES2TUPLE = {
     'sxyz': (0, 0, 0, 0), 'sxyx': (0, 0, 1, 0), 'sxzy': (0, 1, 0, 0),
@@ -26,7 +27,7 @@ _AXES2TUPLE = {
     'rzxz': (2, 0, 1, 1), 'rxyz': (2, 1, 0, 1), 'rzyz': (2, 1, 1, 1)}
 _NEXT_AXIS = [1, 2, 0, 1]
 
-
+#from https://github.com/matthew-brett/transforms3d
 def quaternion_matrix(quaternion):
     """Return homogeneous rotation matrix from quaternion.
     >>> R = quaternion_matrix([0.06146124, 0, 0, 0.99810947])
@@ -45,7 +46,7 @@ def quaternion_matrix(quaternion):
         (    q[0, 2]-q[1, 3],     q[1, 2]+q[0, 3], 1.0-q[0, 0]-q[1, 1], 0.0),
         (                0.0,                 0.0,                 0.0, 1.0)
         ), dtype=numpy.float64)
-
+#from https://github.com/matthew-brett/transforms3d
 def euler_from_quaternion(quaternion, axes='sxyz'):
     """Return Euler angles from quaternion for specified axis sequence.
     >>> angles = euler_from_quaternion([0.06146124, 0, 0, 0.99810947])
@@ -54,7 +55,7 @@ def euler_from_quaternion(quaternion, axes='sxyz'):
     """
     return euler_from_matrix(quaternion_matrix(quaternion), axes)
 
-
+#from https://github.com/matthew-brett/transforms3d
 def euler_from_matrix(matrix, axes='sxyz'):
     """Return Euler angles from rotation matrix for specified axis sequence.
     axes : One of 24 axis sequences as string or encoded tuple
@@ -101,18 +102,18 @@ def euler_from_matrix(matrix, axes='sxyz'):
             ax = math.atan2(-M[j, k],  M[j, j])
             ay = math.atan2(-M[k, i],  cy)
             az = 0.0
-
     if parity:
         ax, ay, az = -ax, -ay, -az
     if frame:
         ax, az = az, ax
     return ax, ay, az
+
 removelatex="1"
 def evaluate(eval_path, gt_path):
     print("File to be evaluated:{}".format(eval_path))
     axis = numpy.array([[0.0, 4.5, 3.2, 9.5], [-5, 10, -10, 20], [-1, 16, -7, 20]])
     setnum=0
-    output_plot_file_name = "out.pdf"    
+    output_plot_file_name = "out.pdf"
     texfile = "latex.tex"
     if removelatex == "1":
         try:
@@ -126,12 +127,25 @@ def evaluate(eval_path, gt_path):
             os.remove(output_plot_file_name)
         except:
             print("{} could not be deleted as it does not exist.".format(output_plot_file_name))
-
-
     def read_file(filepath_to_read):
         with open(filepath_to_read) as gt_in:
-            return (np.fromstring(gt_in.read(), sep="   ").reshape(-1, 8))
-
+            t=np.array([])
+            Lines = gt_in.readlines()
+            count=0
+            for line in Lines:
+            	a = line.split("   ")
+            	if len(a ) == 1:
+            		continue
+            	digits2=a[0].split(".")
+            	stringy=float(digits2[0][4:]+'.'+digits2[1][:-1])
+            	floata=np.array(a).astype(float)
+            	floata[0]=stringy
+            	if count == 0:
+            		t=np.array(floata)
+            		count=1
+            	else:
+            		t=np.vstack((t,np.array(floata)))
+            return t
 
     def plot_data(data, str_color):
         plt.plot(data[:, 1], data[:, 2], str_color, linewidth=2)
@@ -150,38 +164,36 @@ def evaluate(eval_path, gt_path):
         if eval_data[2] > maxmin[3]:
             maxmin[3]=eval_data[2]
 
+    def m44(x,y,z):
+        return numpy.array((1.0, 0.0, 0.0, x),(0.0, 1.0, 0.0, y),(0.0, 0.0, 1.0, z),(0.0, 0.0, 0.0, 1.0), dtype=numpy.float64)
+
+    def exm44(data):
+        return np.array((data[0,3],data[1,3],data[2,3]), dtype=numpy.float64)
     def getpathlength(data):
-        path_length =0       	
+        path_length =0
         prev_x=0
         prev_y=0
         for i in range(0, np.size(data, 0) - 1):
             cur_x=data[i,1]
             cur_y=data[i,2] 
-            if i != 0:                                           
+            if i != 0:
                path_length = path_length +math.sqrt(math.pow(cur_x-prev_x,2)+math.pow(cur_y-prev_y,2))
             prev_x=cur_x
             prev_y=cur_y
-        return path_length      	
-	
+        return path_length
+
     '''Prepare the plot'''
     f = plt.figure()
     plt.grid()
-    
-    plt.axis('equal') 
+
+    plt.axis('equal')
     plt.gca().set_aspect('equal', adjustable='box')
-    f.tight_layout()   
+    f.tight_layout()
     '''Begin Main'''
     remove_old_output_file()
     gt_data = read_file(gt_path)
-    for i in range(len(gt_data)):
-        digits="%.10f" % gt_data[i,0]
-        digits2=digits.split(".")
-        gt_data[i,0]=float(digits2[0][4:]+'.'+digits2[1][:-1])
-    eval_data = read_file(eval_path)  
-    for i in range(len(eval_data)):
-        digits="%.10f" % eval_data[i,0]
-        digits2=digits.split(".")
-        eval_data[i,0]=float(digits2[0][4:]+'.'+digits2[1][:-1]) 
+    eval_data = read_file(eval_path)
+
     maxmin=[eval_data[0,1],eval_data[0,1],eval_data[0,2] ,eval_data[0,2]]   
     plot_data(gt_data, 'black')
     plot_data(eval_data, 'orange')
@@ -223,9 +235,12 @@ def evaluate(eval_path, gt_path):
     firsteval=1
     discon=0.0
     discon2=0.0
+    discon3=0.0
     disconcount=0
-    for i in range(0, np.size(eval_data, 0) - 1): 
-        getmaxmin(eval_data[i],maxmin) #required for plotting          
+    for i in range(0, np.size(gt_data, 0)):
+        getmaxmin(gt_data[i],maxmin)#required for plotting
+    for i in range(0, np.size(eval_data, 0)):
+        getmaxmin(eval_data[i],maxmin) #required for plotting
         if eval_data[i, 0] < gt_data[0, 0]:
             print("no gt data available for this timestamp")
         else:
@@ -239,12 +254,18 @@ def evaluate(eval_path, gt_path):
                     klast = k
                     skip = 0
                     break
+                if skip == 1:
+                    for k in range(klast, np.size(gt_data, 0)):
+                      if eval_data[i, 0] == gt_data[k, 0]:
+                        k=k-1
+                        skip = 0
+                        break
             if skip == 0:
                 a = (eval_data[i, 0] - gt_data[k, 0]) / (gt_data[k + 1, 0] - gt_data[k, 0])
                 x_gt = a * gt_data[k + 1, 1] + (1 - a) * gt_data[k, 1]
                 y_gt = a * gt_data[k + 1, 2] + (1 - a) * gt_data[k, 2]
                 z_gt = 0
-                #z_gt = a * gt_data[k + 1, 3] + (1 - a) * gt_data[k, 3]		
+                #z_gt = a * gt_data[k + 1, 3] + (1 - a) * gt_data[k, 3]
                 e = np.sqrt((eval_data[i, 1] - x_gt) ** 2 + (eval_data[i, 2] - y_gt) ** 2)
                 #e = np.sqrt((eval_data[i, 1] - x_gt) ** 2 + (eval_data[i, 2] - y_gt) ** 2+ (eval_data[i, 3] - z_gt) ** 2)
                 error_array = np.append(error_array, e)
@@ -262,10 +283,13 @@ def evaluate(eval_path, gt_path):
                    #with the calculate length then being too large. We therefor directly compare the lenght of the two vectors.                   
                    lengveceval=math.sqrt(math.pow(veceval[0],2)+math.pow(veceval[1],2))
                    lengveceval2=math.sqrt(math.pow(veceval[0]-vecgt[0],2)+math.pow(veceval[1]-vecgt[1],2))
+                   #vecevaltf=exm44(np.matmul(ominus(m44(eval_data[i-1, 1],eval_data[i-1, 2]),m44(prevgt[0],prevgt[1])),m44(veceval[0],veceval[1])))
+                   #lengveceval3=math.sqrt(math.pow(vecevaltf[0]-vecgt[0],2)+math.pow(vecevaltf[1]-vecgt[1],2))
                    if lenvecgt > 0.0001 :
                       discon=discon+math.pow(1-lengveceval/lenvecgt,2)
                       discon2=discon2+math.pow(lengveceval2/lenvecgt,2)
-                      disconcount=disconcount+1                
+                      #discon3=discon3+math.pow(lengveceval3/lenvecgt,2)
+                      disconcount=disconcount+1
                 prevgt=[x_gt,y_gt,z_gt]
                 #angle at k+1 and angle at current k
                 angleskp1 = euler_from_quaternion([gt_data[k + 1, 4], gt_data[k + 1,5],gt_data[k + 1,6], gt_data[k + 1, 7]])
@@ -282,17 +306,18 @@ def evaluate(eval_path, gt_path):
                 	anglez_gt=(angleskp1[2])*a+(1-a)*intermedian 
                 	if anglez_gt > math.pi:
                 	  anglez_gt=anglez_gt-2*math.pi
-                else:               
+                else:
                 	anglez_gt=a*angleskp1[2]+(1-a)*anglesk[2]
                 angleval= euler_from_quaternion([eval_data[i, 4], eval_data[i,5],eval_data[i,6], eval_data[i, 7]])
                 eang=angleval[2]-anglez_gt   
                 if(eang>3.14159265359):
-                	eang=eang-3.14159265359 
+                	eang=2*3.14159265359-eang
                 if(eang<-3.14159265359):
-                	eang=eang+3.14159265359 
+                	eang=-2*3.14159265359-eang
                 error_ang_array = np.append(error_ang_array,eang)
     if len(error_array) == 0:
         print("No Data with matching timestamps")
+        #plt.show()
         return
     rmse = np.sqrt(np.dot(error_array, error_array) / len(error_array))
     mean = np.mean(error_array)
@@ -300,14 +325,14 @@ def evaluate(eval_path, gt_path):
     median = np.median(error_array)
     std = np.std(error_array)
     max = np.max(error_array)
-    min = np.min(error_array)   
+    min = np.min(error_array)
     if(max < abs(min)):
     	print("Min > Max")
-    	max=abs(min)	    
+    	max=abs(min)
     maxang=np.max(error_ang_array)
-    minang=np.min(error_ang_array)        
+    minang=np.min(error_ang_array)
     if(maxang < abs(minang)):
-    	maxang=abs(minang)	
+    	maxang=abs(minang)
     meanang = np.mean(error_ang_array)
     medianang = np.median(error_ang_array)
     stdang = np.std(error_ang_array)
@@ -328,24 +353,26 @@ def evaluate(eval_path, gt_path):
     	relpath=evallength/gtlength
     discoty=0
     discoty2=0
+    discoty3=0
     if disconcount != 0:
     	discoty=math.sqrt(discon)/disconcount
     	discoty2=math.sqrt(discon2/disconcount)
+    	discoty3=math.sqrt(discon3/disconcount)
 
     with open(texfile, "a") as param:
-        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)+" & {:.3f}\n".format(discoty2)
+        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)+ " & {:.3f}".format(discoty2)+" & {:.3f}\n".format(discoty3)
         param.write(writing)
     with open(texfile, "r+") as param:
         content = param.read()
         param.seek(0, 0)
-        writing = "Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 "   
-        writing = writing + " \\\ \hline \n"             
+        writing = "Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 & D_3 "   
+        writing = writing + " \\\ \hline \n"
         param.write(writing + content)
-    print("Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 ")
-    print(rmse,rmset,rmser,max,maxang, mean, meanang, median,medianang, std, stdang,relpath*100.0,discoty,discoty2)
+    print("Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 & D_3 ")
+    print(rmse,rmset,rmser,max,maxang, mean, meanang, median,medianang, std, stdang,relpath*100.0,discoty,discoty2,discoty3)
     '''crs=mplcursors.cursor(hover=True)
     crs.connect("add", lambda sel: sel.annotation.set_text('Point {},{}'.format(sel.target[0], sel.target[1])))
-    plt.show()'''	
+    plt.show()'''
     plt.xlim(maxmin[0]-1, maxmin[1]+1)
     plt.ylim(maxmin[2]-1, maxmin[3]+1)
     '''Save Plot'''
@@ -357,5 +384,5 @@ def evaluate(eval_path, gt_path):
 if __name__ == "__main__":
     removelatex=sys.argv[3]
     if removelatex == "1":
-        print(sys.argv[2],sys.argv[1],removelatex)	
+        print(sys.argv[2],sys.argv[1],removelatex)
     evaluate(sys.argv[1], sys.argv[2])
