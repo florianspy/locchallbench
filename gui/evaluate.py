@@ -2,6 +2,7 @@
 #The reason for this is that python stores all the data in float variables which can only handle 15 digits
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from matplotlib.lines import Line2D
 import numpy
 import evaluate_rpe as tr
@@ -12,6 +13,9 @@ import os
 from pathlib import Path
 import math
 import mplcursors
+
+mpl.rc('font',family='Times New Roman')
+
 plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['ps.fonttype'] = 42
 #from https://github.com/matthew-brett/transforms3d
@@ -220,7 +224,7 @@ def evaluate(eval_path, gt_path):
     patchList.append(black_patch)
     patchList.append(start)
     patchList.append(goal)
-    first_legend=plt.legend(handles=patchList,loc='upper left',fancybox=True, framealpha=0.5, markerscale=1,handletextpad=0.,bbox_to_anchor=(-0.02, 1.02),frameon=False,fontsize=24)  #  
+    first_legend=plt.legend(handles=patchList,fancybox=True,loc='upper left' ,framealpha=0.5, markerscale=1,handletextpad=0.,frameon=False,fontsize=24,bbox_to_anchor=(-0.05, 1.0))  # lower right .04, -0.04) upper left (-0.05, 1.04)
     skip = 1
     # http://akuederle.com/create-numpy-array-with-for-loop
     error_array = np.array([])
@@ -255,11 +259,11 @@ def evaluate(eval_path, gt_path):
                     skip = 0
                     break
                 if skip == 1:
-                    for k in range(klast, np.size(gt_data, 0)):
-                      if eval_data[i, 0] == gt_data[k, 0]:
-                        k=k-1
-                        skip = 0
-                        break
+                    k = np.size(gt_data, 0)-1
+                    if eval_data[i, 0] == gt_data[k, 0]:
+                    	k=k-1
+                    	skip = 0			
+                    	break
             if skip == 0:
                 a = (eval_data[i, 0] - gt_data[k, 0]) / (gt_data[k + 1, 0] - gt_data[k, 0])
                 x_gt = a * gt_data[k + 1, 1] + (1 - a) * gt_data[k, 1]
@@ -288,6 +292,8 @@ def evaluate(eval_path, gt_path):
                    if lenvecgt > 0.0001 :
                       discon=discon+math.pow(1-lengveceval/lenvecgt,2)
                       discon2=discon2+math.pow(lengveceval2/lenvecgt,2)
+                      if abs(lengveceval2-lenvecgt)>0.01:
+                        print(lengveceval2,lenvecgt)
                       #discon3=discon3+math.pow(lengveceval3/lenvecgt,2)
                       disconcount=disconcount+1
                 prevgt=[x_gt,y_gt,z_gt]
@@ -309,7 +315,7 @@ def evaluate(eval_path, gt_path):
                 else:
                 	anglez_gt=a*angleskp1[2]+(1-a)*anglesk[2]
                 angleval= euler_from_quaternion([eval_data[i, 4], eval_data[i,5],eval_data[i,6], eval_data[i, 7]])
-                eang=angleval[2]-anglez_gt   
+                eang=angleval[2]-anglez_gt
                 if(eang>3.14159265359):
                 	eang=2*3.14159265359-eang
                 if(eang<-3.14159265359):
@@ -360,16 +366,16 @@ def evaluate(eval_path, gt_path):
     	discoty3=math.sqrt(discon3/disconcount)
 
     with open(texfile, "a") as param:
-        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)+ " & {:.3f}".format(discoty2)+" & {:.3f}\n".format(discoty3)
+        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)+ " & {:.3f}".format(discoty2)
         param.write(writing)
     with open(texfile, "r+") as param:
         content = param.read()
         param.seek(0, 0)
-        writing = "Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 & D_3 "   
+        writing = "Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2"   
         writing = writing + " \\\ \hline \n"
         param.write(writing + content)
-    print("Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 & D_3 ")
-    print(rmse,rmset,rmser,max,maxang, mean, meanang, median,medianang, std, stdang,relpath*100.0,discoty,discoty2,discoty3)
+    print("Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 ")
+    print(rmse,rmset,rmser,max,maxang, mean, meanang, median,medianang, std, stdang,relpath*100.0,discoty,discoty2)
     '''crs=mplcursors.cursor(hover=True)
     crs.connect("add", lambda sel: sel.annotation.set_text('Point {},{}'.format(sel.target[0], sel.target[1])))
     plt.show()'''
