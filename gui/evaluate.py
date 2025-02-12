@@ -6,6 +6,7 @@ import matplotlib as mpl
 from matplotlib.lines import Line2D
 import numpy
 import evaluate_rpe as tr
+import evaluate_ate as ate
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
 import sys
@@ -113,7 +114,7 @@ def euler_from_matrix(matrix, axes='sxyz'):
     return ax, ay, az
 
 removelatex="1"
-def evaluate(eval_path, gt_path):
+def evaluate(eval_path, gt_path,blocpaperversion):
     print("File to be evaluated:{}".format(eval_path))
     axis = numpy.array([[0.0, 4.5, 3.2, 9.5], [-5, 10, -10, 20], [-1, 16, -7, 20]])
     setnum=0
@@ -137,12 +138,12 @@ def evaluate(eval_path, gt_path):
             Lines = gt_in.readlines()
             count=0
             for line in Lines:
-            	a = line.split("   ")
+            	a = line.split("   ")#line.split("   ")
             	if len(a ) == 1:
             		continue
             	digits2=a[0].split(".")
-            	stringy=float(digits2[0][4:]+'.'+digits2[1][:-1])
-            	floata=np.array(a).astype(float)
+            	stringy=np.double(digits2[0]+'.'+digits2[1])
+            	floata=np.array(a).astype(np.double)
             	floata[0]=stringy
             	if count == 0:
             		t=np.array(floata)
@@ -197,7 +198,7 @@ def evaluate(eval_path, gt_path):
     remove_old_output_file()
     gt_data = read_file(gt_path)
     eval_data = read_file(eval_path)
-
+    print("Read data had shape:",gt_data.shape,eval_data.shape)	
     maxmin=[eval_data[0,1],eval_data[0,1],eval_data[0,2] ,eval_data[0,2]]   
     plot_data(gt_data, 'black')
     plot_data(eval_data, 'orange')
@@ -227,29 +228,33 @@ def evaluate(eval_path, gt_path):
     first_legend=plt.legend(handles=patchList,fancybox=True,loc='upper left' ,framealpha=0.5, markerscale=1,handletextpad=0.,frameon=False,fontsize=24,bbox_to_anchor=(-0.05, 1.0))  # lower right .04, -0.04) upper left (-0.05, 1.04)
     skip = 1
     # http://akuederle.com/create-numpy-array-with-for-loop
-    error_array = np.array([])
-    error_ang_array = np.array([])
     klast = 0
     gtlength=getpathlength(gt_data)
     evallength=getpathlength(eval_data)
     print(evallength)
     print(gtlength)
-    totaldata=0
+    error_array = np.array([])
+    error_ang_array = np.array([])
+    discon2array=np.array([])
     prevgt=[0,0,0]
     firsteval=1
     discon=0.0
     discon2=0.0
-    discon3=0.0
     disconcount=0
+    done=0
+    lastvalue=0
+    if blocpaperversion == '1':
+        lastvalue=-1
+    #print(blocpaperversion,lastvalue)
     for i in range(0, np.size(gt_data, 0)):
         getmaxmin(gt_data[i],maxmin)#required for plotting
-    for i in range(0, np.size(eval_data, 0)):
+    for i in range(0, np.size(eval_data, 0)+lastvalue):
         getmaxmin(eval_data[i],maxmin) #required for plotting
         if eval_data[i, 0] < gt_data[0, 0]:
-            print("no gt data available for this timestamp")
+            print("no gt data available for this timestamp",eval_data[i, 0],gt_data[0, 0])
         else:
             if eval_data[i, 0] > gt_data[np.size(gt_data, 0) - 1, 0]:
-                print("no more gt data available")
+                print("no more gt data available",eval_data[i, 0],gt_data[np.size(gt_data, 0) - 1, 0])
                 break
             for k in range(klast, np.size(gt_data, 0) - 1):
                 skip = 1
@@ -262,7 +267,8 @@ def evaluate(eval_path, gt_path):
                     k = np.size(gt_data, 0)-1
                     if eval_data[i, 0] == gt_data[k, 0]:
                     	k=k-1
-                    	skip = 0			
+                    	skip = 0
+                    	done =1 #avoids if the last two timestamps of the dataset are given twice those data gets evaluated
                     	break
             if skip == 0:
                 a = (eval_data[i, 0] - gt_data[k, 0]) / (gt_data[k + 1, 0] - gt_data[k, 0])
@@ -275,6 +281,8 @@ def evaluate(eval_path, gt_path):
                 error_array = np.append(error_array, e)
                 if firsteval == 1:
                    firsteval = 0
+                   #first value cannot be a discontinuity
+                   discon2array= np.append(discon2array,-1)
                 else:
                    vecgt=[x_gt-prevgt[0],y_gt-prevgt[1]]
                    #vecgt=[x_gt-prevgt[0],y_gt-prevgt[1],z_gt-prevgt[2]]
@@ -287,15 +295,17 @@ def evaluate(eval_path, gt_path):
                    #with the calculate length then being too large. We therefor directly compare the lenght of the two vectors.                   
                    lengveceval=math.sqrt(math.pow(veceval[0],2)+math.pow(veceval[1],2))
                    lengveceval2=math.sqrt(math.pow(veceval[0]-vecgt[0],2)+math.pow(veceval[1]-vecgt[1],2))
+                   #Vecevaltf transforms eval data into the GT system the transform is calculated via ominus and applied on the eval data
                    #vecevaltf=exm44(np.matmul(ominus(m44(eval_data[i-1, 1],eval_data[i-1, 2]),m44(prevgt[0],prevgt[1])),m44(veceval[0],veceval[1])))
                    #lengveceval3=math.sqrt(math.pow(vecevaltf[0]-vecgt[0],2)+math.pow(vecevaltf[1]-vecgt[1],2))
                    if lenvecgt > 0.0001 :
                       discon=discon+math.pow(1-lengveceval/lenvecgt,2)
-                      discon2=discon2+math.pow(lengveceval2/lenvecgt,2)
-                      if abs(lengveceval2-lenvecgt)>0.01:
-                        print(lengveceval2,lenvecgt)
-                      #discon3=discon3+math.pow(lengveceval3/lenvecgt,2)
+                      disco2value=math.pow(lengveceval2/lenvecgt,2)
+                      discon2=discon2+disco2value
+                      discon2array= np.append(discon2array,disco2value)
                       disconcount=disconcount+1
+                   else:
+                      discon2array= np.append(discon2array,-1)
                 prevgt=[x_gt,y_gt,z_gt]
                 #angle at k+1 and angle at current k
                 angleskp1 = euler_from_quaternion([gt_data[k + 1, 4], gt_data[k + 1,5],gt_data[k + 1,6], gt_data[k + 1, 7]])
@@ -320,14 +330,16 @@ def evaluate(eval_path, gt_path):
                 	eang=2*3.14159265359-eang
                 if(eang<-3.14159265359):
                 	eang=-2*3.14159265359-eang
-                error_ang_array = np.append(error_ang_array,eang)
+                error_ang_array = np.append(error_ang_array,abs(eang))
+        if done == 1:
+                break
     if len(error_array) == 0:
         print("No Data with matching timestamps")
         #plt.show()
         return
     rmse = np.sqrt(np.dot(error_array, error_array) / len(error_array))
-    mean = np.mean(error_array)
-    meanang = np.mean(error_ang_array)
+    rmsear = np.sqrt(np.dot(error_ang_array, error_ang_array) / len(error_ang_array))
+    #mean = np.mean(error_array)
     median = np.median(error_array)
     std = np.std(error_array)
     max = np.max(error_array)
@@ -335,21 +347,62 @@ def evaluate(eval_path, gt_path):
     if(max < abs(min)):
     	print("Min > Max")
     	max=abs(min)
+    #meanang = np.mean(error_ang_array)
+    medianang = np.median(error_ang_array)
+    stdang = np.std(error_ang_array)
     maxang=np.max(error_ang_array)
     minang=np.min(error_ang_array)
     if(maxang < abs(minang)):
     	maxang=abs(minang)
-    meanang = np.mean(error_ang_array)
-    medianang = np.median(error_ang_array)
-    stdang = np.std(error_ang_array)
+    rel_trans_error=[]
+    rel_rot_error=[]
+    rel_trans_errorperframe=[]
+    rel_rot_errorperframe=[]
+    lengt=[]
+    rotgt=[]
+    lenperframegt=[]
+    rotperframegt=[]
+    ccrt=0
+    ccrs=0
     try:
+    	print(gt_path,eval_path)
     	traj_gt = tr.read_trajectory(gt_path)
     	traj_est = tr.read_trajectory(eval_path)
-    	result = tr.evaluate_trajectory(traj_gt, traj_est, 10000, True, 1.00, "s", 0.00, 1.00)
-    	trans_error = numpy.array(result)[:, 4]
-    	rot_error = numpy.array(result)[:, 5]
-    	rmset = numpy.sqrt(numpy.dot(trans_error, trans_error) / len(trans_error))
-    	rmser = numpy.sqrt(numpy.dot(rot_error, rot_error) / len(rot_error))#we do not convert to degree!
+    	result = tr.evaluate_trajectory(traj_gt, traj_est, 10000, True, 1.0, "s", 0.00, 1.00)
+    	rel_trans_error = numpy.array(result)[:, 4]
+    	rel_rot_error = numpy.array(result)[:, 5]
+    	lengt = numpy.array(result)[:, 6]
+    	rotgt = numpy.array(result)[:, 7]
+    	rmset = numpy.sqrt(numpy.dot(rel_trans_error, rel_trans_error) / len(rel_trans_error))
+    	rmser = numpy.sqrt(numpy.dot(rel_rot_error, rel_rot_error) / len(rel_rot_error))#we do not convert to degree!
+    	ccl=np.divide(rel_trans_error,lengt)
+    	x_ind=np.zeros(len(ccl))
+    	for k in range(0,len(ccl)):
+    		if rel_trans_error[k] < 0.001:
+    			x_ind[k]=1
+    		else:
+    			x_ind[k]=ccl[k]<=0.5
+    	ccrt=np.sum(x_ind)/x_ind.size*100
+    	print("CCRT",np.sum(x_ind),x_ind.size)
+    	#challenge cope score rotatioanl
+    	ccr=np.divide(rel_rot_error,rotgt)
+    	x_ind=np.zeros(len(ccr))
+    	for k in range(0,len(ccr)):
+    		if rel_rot_error[k] < 0.00873:
+    			x_ind[k]=1
+    		else:
+    			x_ind[k]=ccr[k]<=0.5
+    	ccrs=np.sum(x_ind)/x_ind.size*100
+    	print("CCRS",np.sum(x_ind),x_ind.size)
+    	print("fine")
+    	#resultframewise = tr.evaluate_trajectory(traj_gt, traj_est, 10000, True, 1.0, "f", 0.00, 1.00)
+    	#rel_rot_errorperframe = numpy.array(resultframewise)[:, 5]
+	#rotperframegt = numpy.array(resultframewise)[:, 7]
+    	#result2 = tr.evaluate_trajectory(traj_gt, traj_est, 10000, True, 1.0, "f", 0.00, 1.00)
+    	#rel_trans_errorperframe = numpy.array(result2)[:, 4]
+    	#rel_rot_errorperframe=numpy.array(result2)[:, 5]
+    	#lenperframegt = numpy.array(result2)[:, 6]
+    	#rotperframegt=numpy.array(result2)[:, 7]
     except:
     	rmser=0
     	rmset=0
@@ -359,36 +412,44 @@ def evaluate(eval_path, gt_path):
     	relpath=evallength/gtlength
     discoty=0
     discoty2=0
-    discoty3=0
     if disconcount != 0:
     	discoty=math.sqrt(discon)/disconcount
     	discoty2=math.sqrt(discon2/disconcount)
-    	discoty3=math.sqrt(discon3/disconcount)
-
     with open(texfile, "a") as param:
-        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(mean)+ " & {:.3f}".format(meanang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)+ " & {:.3f}".format(discoty2)
+        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmsear) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)+ " & {:.3f}".format(discoty2) +" & {:.3f}".format(ccrt)+" & {:.3f}".format(ccrs) + "\n" 
         param.write(writing)
     with open(texfile, "r+") as param:
         content = param.read()
         param.seek(0, 0)
-        writing = "Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2"   
-        writing = writing + " \\\ \hline \n"
-        param.write(writing + content)
-    print("Algorithm & RMSE(at) & RMSE(rt) & RMSE(rr) & Maxt & Maxr & Meant & Meanr & Mediant & Medianr & Stdt & Stdr & Pathratio & Discontinuity & D_2 ")
-    print(rmse,rmset,rmser,max,maxang, mean, meanang, median,medianang, std, stdang,relpath*100.0,discoty,discoty2)
+        writing = "Algorithm & RMSE_t & RMSE_{\|r\|} & RMSE_{rt} & RMSE_{rr} & Max_t & Max_{\|r\|} & Median_t & Median_{\|r\|} & Std_t & Std_{\|r\|} & Pathratio & Discontinuity & D_2 & CC_{rt}^{1 mm} & CC_{rr}^{0.5^\circ}"    
+        writing = writing +eval_path+ " \\\ \hline  \n"
+        param.write(writing + content )
+    print("Algorithm & RMSE_t & RMSE_{\|r\|} & RMSE_{rt} & RMSE_{rr} & Max_t & Max_{\|r\|} & Median_t & Median_{\|r\|} & Std_t & Std_{\|r\|} & Pathratio & Discontinuity & D_2 & CC_{rt}^{1 mm} & CC_{rr}^{0.5^\circ}")
+    print(rmse,rmsear,rmset,rmser,max,maxang, median,medianang, std, stdang,relpath*100.0,discoty,discoty2,ccrt,ccrs)
     '''crs=mplcursors.cursor(hover=True)
     crs.connect("add", lambda sel: sel.annotation.set_text('Point {},{}'.format(sel.target[0], sel.target[1])))
     plt.show()'''
-    plt.xlim(maxmin[0]-1, maxmin[1]+1)
-    plt.ylim(maxmin[2]-1, maxmin[3]+1)
+    #plt.xlim(maxmin[0]-1, maxmin[1]+1)
+    #plt.ylim(maxmin[2]-1, maxmin[3]+1)
     '''Save Plot'''
     DefaultSize = f.get_size_inches()
     f.set_size_inches( (DefaultSize[0]*2, DefaultSize[1]*2) )
     f.savefig(output_plot_file_name, bbox_inches='tight')
     output_plot_file_name = tail[first+1:end]+".pdf"
     f.savefig(output_plot_file_name, bbox_inches='tight')
+    print("Storing global errors")	
+    error=np.column_stack([error_array,error_ang_array,discon2array])
+    np.savetxt(output_plot_file_name[:-4]+".out",error, delimiter=' ',fmt='%.10f')
+    #relativerot errors and trans errors values and corresponding lengt and rotgt in one file
+    print("Storing rel errors")	
+    relerror=np.column_stack([rel_trans_error, rel_rot_error, lengt,rotgt])
+    np.savetxt(output_plot_file_name[:-4]+"rel.out", relerror, delimiter=' ',fmt='%.10f')
+    print("Storing rel errors per frame")	
+    #relerror=np.column_stack([rel_trans_errorperframe, rel_rot_errorperframe,lenperframegt,rotperframegt])
+    #np.savetxt(output_plot_file_name[:-4]+"relframewise.out", relerror, delimiter=' ',fmt='%.10f')
 if __name__ == "__main__":
     removelatex=sys.argv[3]
+    blocsiepaper=sys.argv[4]
     if removelatex == "1":
-        print(sys.argv[2],sys.argv[1],removelatex)
-    evaluate(sys.argv[1], sys.argv[2])
+        print(sys.argv[2],sys.argv[1],removelatex,blocsiepaper)
+    evaluate(sys.argv[1], sys.argv[2],blocsiepaper)
