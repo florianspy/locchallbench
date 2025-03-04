@@ -16,9 +16,13 @@ import math
 import mplcursors
 
 mpl.rc('font',family='Times New Roman')
-
+mpl.rcParams['mathtext.fontset']='custom'
+mpl.rcParams['mathtext.rm'] = 'Times New Roman'
+mpl.rcParams['mathtext.it'] = 'Times New Roman:italic'
+mpl.rcParams['mathtext.bf'] = 'Times New Roman:bold'
 plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['ps.fonttype'] = 42
+
 #from https://github.com/matthew-brett/transforms3d
 _EPS = numpy.finfo(float).eps * 4.0
 _AXES2TUPLE = {
@@ -59,7 +63,11 @@ def euler_from_quaternion(quaternion, axes='sxyz'):
     True
     """
     return euler_from_matrix(quaternion_matrix(quaternion), axes)
-
+def largervalret(v1,v2):
+	if v1 > v2:
+		return v1
+	else:
+		return v2
 #from https://github.com/matthew-brett/transforms3d
 def euler_from_matrix(matrix, axes='sxyz'):
     """Return Euler angles from rotation matrix for specified axis sequence.
@@ -199,6 +207,8 @@ def evaluate(eval_path, gt_path,blocpaperversion):
     gt_data = read_file(gt_path)
     eval_data = read_file(eval_path)
     print("Read data had shape:",gt_data.shape,eval_data.shape)	
+    maxamountofdatapoints=eval_data.shape[0]*10 #we automatically maxamountofdatapoints to more than the amout of data we totally have otherwise multiple evaluations will give different results as the script from rgbd-slam uses / requires this value.
+    #evaluate_trajectory function randomly picks maxamountofdatapoints out of all datapoints and does evaluation with them. If maxamountofdatapoints > amountofdatapoints picking randomly datapoints still leads to all datapoints getting picked, and the random effect picking has no effect on the result	
     maxmin=[eval_data[0,1],eval_data[0,1],eval_data[0,2] ,eval_data[0,2]]   
     plot_data(gt_data, 'black')
     plot_data(eval_data, 'orange')
@@ -243,6 +253,7 @@ def evaluate(eval_path, gt_path,blocpaperversion):
     disconcount=0
     done=0
     lastvalue=0
+    #not recommended anymore as it skips last datapoint
     if blocpaperversion == '1':
         lastvalue=-1
     #print(blocpaperversion,lastvalue)
@@ -339,7 +350,6 @@ def evaluate(eval_path, gt_path,blocpaperversion):
         return
     rmse = np.sqrt(np.dot(error_array, error_array) / len(error_array))
     rmsear = np.sqrt(np.dot(error_ang_array, error_ang_array) / len(error_ang_array))
-    #mean = np.mean(error_array)
     median = np.median(error_array)
     std = np.std(error_array)
     max = np.max(error_array)
@@ -347,7 +357,6 @@ def evaluate(eval_path, gt_path,blocpaperversion):
     if(max < abs(min)):
     	print("Min > Max")
     	max=abs(min)
-    #meanang = np.mean(error_ang_array)
     medianang = np.median(error_ang_array)
     stdang = np.std(error_ang_array)
     maxang=np.max(error_ang_array)
@@ -365,10 +374,13 @@ def evaluate(eval_path, gt_path,blocpaperversion):
     ccrt=0
     ccrs=0
     try:
-    	print(gt_path,eval_path)
     	traj_gt = tr.read_trajectory(gt_path)
     	traj_est = tr.read_trajectory(eval_path)
-    	result = tr.evaluate_trajectory(traj_gt, traj_est, 10000, True, 1.0, "s", 0.00, 1.00)
+
+    	result = tr.evaluate_trajectory(traj_gt, traj_est, maxamountofdatapoints, True, 1.0, "s", 0.00, 1.00)
+	#timestamps for the first point of the vectors of estimation and ground truth
+    	stampest_1 = numpy.array(result)[:, 0]
+    	stampgt_1 = numpy.array(result)[:, 2]
     	rel_trans_error = numpy.array(result)[:, 4]
     	rel_rot_error = numpy.array(result)[:, 5]
     	lengt = numpy.array(result)[:, 6]
@@ -377,23 +389,27 @@ def evaluate(eval_path, gt_path,blocpaperversion):
     	rmser = numpy.sqrt(numpy.dot(rel_rot_error, rel_rot_error) / len(rel_rot_error))#we do not convert to degree!
     	ccl=np.divide(rel_trans_error,lengt)
     	x_ind=np.zeros(len(ccl))
+    	minireltranserror=0.001
+    	minirelroterror=0.00873
+    	percentagevaltrans=0.5
+    	percentagevalrot=0.5
     	for k in range(0,len(ccl)):
-    		if rel_trans_error[k] < 0.001:
+    		if rel_trans_error[k] < minireltranserror:
     			x_ind[k]=1
     		else:
-    			x_ind[k]=ccl[k]<=0.5
+    			x_ind[k]=ccl[k]<=percentagevaltrans #changed to 0.1 from 0.5
     	ccrt=np.sum(x_ind)/x_ind.size*100
-    	print("CCRT",np.sum(x_ind),x_ind.size)
-    	#challenge cope score rotatioanl
+    	#print("CCRT",np.sum(x_ind),x_ind.size)
+    	#challenge cope score rotational
     	ccr=np.divide(rel_rot_error,rotgt)
     	x_ind=np.zeros(len(ccr))
     	for k in range(0,len(ccr)):
-    		if rel_rot_error[k] < 0.00873:
+    		if rel_rot_error[k] < minirelroterror:
     			x_ind[k]=1
     		else:
-    			x_ind[k]=ccr[k]<=0.5
+    			x_ind[k]=ccr[k]<=percentagevalrot #changed to 0.1 from 0.5
     	ccrs=np.sum(x_ind)/x_ind.size*100
-    	print("CCRS",np.sum(x_ind),x_ind.size)
+    	#print("CCRS",np.sum(x_ind),x_ind.size)
     	print("fine")
     	#resultframewise = tr.evaluate_trajectory(traj_gt, traj_est, 10000, True, 1.0, "f", 0.00, 1.00)
     	#rel_rot_errorperframe = numpy.array(resultframewise)[:, 5]
@@ -410,13 +426,22 @@ def evaluate(eval_path, gt_path,blocpaperversion):
     relpath = 1
     if gtlength != 0: 
     	relpath=evallength/gtlength
+    pfr=float('-inf')
+    if relpath != 0:
+    	if relpath < 1:
+    		pfr=1/-relpath+1
+    	else:
+    		pfr=relpath/1-1	
+
     discoty=0
     discoty2=0
+    #discon2array will have -1 when lenvecgt <= 0.0001 however we dont use it anyway here so its fine and also only increase disconcount in other case,  
+    #we have to add this so that error array and discon have the same length, even so its not of use and should not be considered as the correct discon value for that datapoint!	 
     if disconcount != 0:
     	discoty=math.sqrt(discon)/disconcount
     	discoty2=math.sqrt(discon2/disconcount)
     with open(texfile, "a") as param:
-        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmsear) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(relpath*100.0)+ " & {:.3f}".format(discoty)+ " & {:.3f}".format(discoty2) +" & {:.3f}".format(ccrt)+" & {:.3f}".format(ccrs) + "\n" 
+        writing = tail[first+1:end] + " & {:.3f}".format(rmse) + " & {:.3f}".format(rmsear) + " & {:.3f}".format(rmset)+ " & {:.3f}".format(rmser) + " & {:.3f}".format(max)+ " & {:.3f}".format(maxang) + " & {:.3f}".format(median)+ " & {:.3f}".format(medianang) + " & {:.3f}".format(std)+ " & {:.3f}".format(stdang)+ " & {:.3f}".format(pfr)+ " & {:.3f}".format(discoty)+ " & {:.3f}".format(discoty2) +" & {:.3f}".format(ccrt)+" & {:.3f}".format(ccrs) + " & {:.3f}".format(relpath*100.0) +"\n" 
         param.write(writing)
     with open(texfile, "r+") as param:
         content = param.read()
@@ -424,27 +449,25 @@ def evaluate(eval_path, gt_path,blocpaperversion):
         writing = "Algorithm & RMSE_t & RMSE_{\|r\|} & RMSE_{rt} & RMSE_{rr} & Max_t & Max_{\|r\|} & Median_t & Median_{\|r\|} & Std_t & Std_{\|r\|} & Pathratio & Discontinuity & D_2 & CC_{rt}^{1 mm} & CC_{rr}^{0.5^\circ}"    
         writing = writing +eval_path+ " \\\ \hline  \n"
         param.write(writing + content )
-    print("Algorithm & RMSE_t & RMSE_{\|r\|} & RMSE_{rt} & RMSE_{rr} & Max_t & Max_{\|r\|} & Median_t & Median_{\|r\|} & Std_t & Std_{\|r\|} & Pathratio & Discontinuity & D_2 & CC_{rt}^{1 mm} & CC_{rr}^{0.5^\circ}")
-    print(rmse,rmsear,rmset,rmser,max,maxang, median,medianang, std, stdang,relpath*100.0,discoty,discoty2,ccrt,ccrs)
+    print("Algorithm & RMSE_t & RMSE_{\|r\|} & RMSE_{rt} & RMSE_{rr} & Max_t & Max_{\|r\|} & Median_t & Median_{\|r\|} & Std_t & Std_{\|r\|} & P & Discontinuity & D_2 & CC_{rt}^{1 mm} & CC_{rr}^{0.5^\circ}& Pathratio")
+    print(rmse,rmsear,rmset,rmser,max,maxang, median,medianang, std, stdang,pfr,discoty,discoty2,ccrt,ccrs,relpath*100.0)
     '''crs=mplcursors.cursor(hover=True)
     crs.connect("add", lambda sel: sel.annotation.set_text('Point {},{}'.format(sel.target[0], sel.target[1])))
     plt.show()'''
-    #plt.xlim(maxmin[0]-1, maxmin[1]+1)
-    #plt.ylim(maxmin[2]-1, maxmin[3]+1)
     '''Save Plot'''
     DefaultSize = f.get_size_inches()
     f.set_size_inches( (DefaultSize[0]*2, DefaultSize[1]*2) )
-    f.savefig(output_plot_file_name, bbox_inches='tight')
     output_plot_file_name = tail[first+1:end]+".pdf"
     f.savefig(output_plot_file_name, bbox_inches='tight')
-    print("Storing global errors")	
+    print("Storing global errors")
+    #remember discon2array has -1 in case lenvecgt <= 0.0001 which basically say skip, we have to add this so that error array and discon have the same length	
     error=np.column_stack([error_array,error_ang_array,discon2array])
     np.savetxt(output_plot_file_name[:-4]+".out",error, delimiter=' ',fmt='%.10f')
     #relativerot errors and trans errors values and corresponding lengt and rotgt in one file
     print("Storing rel errors")	
     relerror=np.column_stack([rel_trans_error, rel_rot_error, lengt,rotgt])
     np.savetxt(output_plot_file_name[:-4]+"rel.out", relerror, delimiter=' ',fmt='%.10f')
-    print("Storing rel errors per frame")	
+    #print("Storing rel errors per frame")	
     #relerror=np.column_stack([rel_trans_errorperframe, rel_rot_errorperframe,lenperframegt,rotperframegt])
     #np.savetxt(output_plot_file_name[:-4]+"relframewise.out", relerror, delimiter=' ',fmt='%.10f')
 if __name__ == "__main__":
