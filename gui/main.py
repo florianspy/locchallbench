@@ -3,7 +3,7 @@ import PySimpleGUIQt as psg
 from PIL import Image, ImageQt
 import matplotlib.pyplot as plt
 import numpy as np
-
+import sys
 # it creates a file
 ############
 ## CONFIG ##
@@ -47,7 +47,7 @@ cfg.error.eval_missing = "Parameter '{}' is missing, please enter it."
 
 # THEME
 psg.theme("Dark")
-
+blocpaperversion=False
 
 class GUI:
     def __init__(self, cfg):
@@ -112,7 +112,7 @@ class GUI:
         try:
             from evaluate import evaluate
 
-            evaluate(eval_path, gt_path)
+            evaluate(eval_path, gt_path,blocpaperversion)
             return False
         except Exception as e:
             print(e)
@@ -120,5 +120,7 @@ class GUI:
 
 
 if __name__ == "__main__":
+    blocpaperversion=sys.argv[1]
+    print(blocpaperversion)
     gui = GUI(cfg)
     gui.run()
